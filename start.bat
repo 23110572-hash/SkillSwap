@@ -57,11 +57,15 @@ echo Opening browser...
 start "" http://localhost:5173
 
 echo.
-echo ========================================
-echo   Backend:  http://localhost:5000
-echo   Frontend: http://localhost:5173
-echo ========================================
-echo   Close this window. Keep Backend and
-echo   Frontend windows open.
-echo ========================================
+echo ==========================================================
+echo   Local Environment:
+echo     Backend:  http://localhost:5000
+echo     Frontend: http://localhost:5173
+echo.
+echo   Production Environment (Deployed):
+echo     Backend:  https://skillswap-zgub.onrender.com
+echo     Frontend: https://skill-swap-nine-xi.vercel.app
+echo ==========================================================
+echo   Close this window. Keep Backend and Frontend windows open.
+echo ==========================================================
 pause

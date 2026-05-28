@@ -1,5 +1,9 @@
 # SkillSwap
 
+### Live Deployment Links
+* **Frontend Web Application**: [https://skill-swap-nine-xi.vercel.app](https://skill-swap-nine-xi.vercel.app)
+* **Backend API Server**: [https://skillswap-zgub.onrender.com](https://skillswap-zgub.onrender.com)
+
 SkillSwap is a full-stack peer-to-peer skill exchange platform built as a web application. Users teach each other without any money changing hands. Instead of paying for a course, you offer a skill you know and earn Skill Coins, which you then spend to learn from someone else. The platform manages the complete lifecycle of these exchanges: listing skills, discovering others, booking sessions, scheduling individual classes, running live video calls, generating AI-powered curricula, auditing session quality, messaging between users, and collecting reviews.
 
 ---
