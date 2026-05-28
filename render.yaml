@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: skillswap-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn --chdir backend "app:create_app()"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: "10000"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
