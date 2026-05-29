@@ -325,27 +325,32 @@ def manage_skills():
     if not instructor_id:
         return jsonify({'message': 'Authorization required or instructor_id needed'}), 401
 
+
     title = data.get('title')
     description = data.get('description')
     if not title or not description:
         return jsonify({'message': 'Title and description are required'}), 400
 
-    # Prevent duplicate listings: same instructor + same title (case-insensitive)
+    title_clean = title.strip()
+    desc_clean = description.strip()
+
+    # Prevent duplicate listings: same instructor + same title (case-insensitive and trimmed)
     existing = Skill.query.filter(
         Skill.user_id == instructor_id,
-        db.func.lower(Skill.title) == title.strip().lower()
+        db.func.lower(db.func.trim(Skill.title)) == title_clean.lower()
     ).first()
     if existing:
         return jsonify({'message': 'You already have a listing with this title. Please use a different name.'}), 400
 
     skill = Skill(
         user_id=instructor_id,
-        title=title,
-        description=description,
+        title=title_clean,
+        description=desc_clean,
         category=data.get('category', 'General'),
         num_classes=int(data.get('num_classes', 1)),
-        timing=data.get('timing', 'Flexible')
+        timing=data.get('timing', 'Flexible').strip()
     )
+
     db.session.add(skill)
     db.session.commit()
     return jsonify({
