@@ -81,9 +81,9 @@ def create_app(config_name='development'):
             from models import User
             from werkzeug.security import generate_password_hash
             seed_users = [
-                {'username': 'krishna', 'email': 'krishna@test.com', 'password': '12345'},
-                {'username': 'subham',  'email': 'subham@test.com',  'password': '12345'},
-                {'username': 'vikas',   'email': 'vikas@test.com',   'password': '12345'},
+                {'username': 'krishna', 'email': 'krishnaagrawal898@gmail.com', 'password': '12345'},
+                {'username': 'subham',  'email': 'subhamkewat482@gmail.com',  'password': '12345'},
+                {'username': 'vikas',   'email': '23110572@outr.ac.in',   'password': '12345'},
             ]
             for u_info in seed_users:
                 if not User.query.filter_by(username=u_info['username']).first():

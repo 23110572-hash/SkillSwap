@@ -244,22 +244,7 @@ def update_profile():
 
 @api_bp.route('/auth/quick-users', methods=['GET'])
 def get_quick_users():
-    usernames = ['JuniorDev', 'SeniorEngineer', 'DesignerPro', 'AIExtremist']
-    emails = ['junior@test.com', 'senior@test.com', 'designer@test.com', 'ai@test.com']
-    passwords = ['devpass123', 'seniorpass', 'design123', 'aipassword']
-
-    users = []
-    for u, em, p in zip(usernames, emails, passwords):
-        user = User.query.filter_by(username=u).first()
-        if not user:
-            user = User(username=u, email=em,
-                        password_hash=generate_password_hash(p), credits=5,
-                        is_verified=True)
-            db.session.add(user)
-            db.session.commit()
-        users.append({'username': u, 'password': p, 'email': em, 'credits': user.credits})
-
-    return jsonify(users), 200
+    return jsonify([]), 200
 
 
 # ──────────────────────────────────────────────────────────────────────────────
