@@ -95,16 +95,6 @@ Run these commands from the root directory:
 ### Running the Servers
 You can start both servers by running my start.bat script in the root directory (on Windows). Alternatively, run them manually:
 
-* Backend:
-  cd backend
-  python app.py
-  (Runs on http://127.0.0.1:5000)
-
-* Frontend:
-  cd frontend
-  npm run dev
-  (Runs on http://localhost:5173)
-
 ## Verified Seed Accounts
 I have pre-created the following accounts in the database for testing. They have been verified and seeded with 10 Skill Coins each:
 
