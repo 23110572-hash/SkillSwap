@@ -5,9 +5,20 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from models import User, Skill
 
+def get_html_from_msg(msg):
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == 'text/html':
+                return part.get_payload(decode=True).decode('utf-8')
+    else:
+        return msg.get_payload()
+    return ""
+
 def send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipient_email, msg):
     ssl_err = None
     tls_err = None
+    smtp_success = False
+
     # Try SSL first if port is 465
     if smtp_port == 465:
         try:
@@ -16,6 +27,7 @@ def send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipi
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_user, recipient_email, msg.as_string())
             server.quit()
+            print("Email successfully sent via SMTP_SSL (Port 465)")
             return True
         except Exception as e:
             ssl_err = e
@@ -23,29 +35,61 @@ def send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipi
             smtp_port = 587
     
     # Try TLS on port 587
-    try:
-        print("Attempting SMTP with STARTTLS on port 587...")
-        server = smtplib.SMTP(smtp_server, 587, timeout=10)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, recipient_email, msg.as_string())
-        server.quit()
-        return True
-    except Exception as e:
-        tls_err = e
-        print(f"TLS port 587 failed: {tls_err}")
-        # Try port 25 as last resort
+    if not smtp_success:
         try:
-            print("Attempting SMTP on port 25...")
-            server = smtplib.SMTP(smtp_server, 25, timeout=10)
+            print("Attempting SMTP with STARTTLS on port 587...")
+            server = smtplib.SMTP(smtp_server, 587, timeout=10)
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_user, recipient_email, msg.as_string())
             server.quit()
+            print("Email successfully sent via STARTTLS (Port 587)")
             return True
-        except Exception as port25_err:
-            print(f"Port 25 failed: {port25_err}")
-            raise Exception(f"All SMTP ports failed. SSL: {ssl_err}, TLS: {tls_err}, Port 25: {port25_err}")
+        except Exception as e:
+            tls_err = e
+            print(f"TLS port 587 failed: {tls_err}")
+            # Try port 25 as last SMTP resort
+            try:
+                print("Attempting SMTP on port 25...")
+                server = smtplib.SMTP(smtp_server, 25, timeout=10)
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, recipient_email, msg.as_string())
+                server.quit()
+                print("Email successfully sent via SMTP (Port 25)")
+                return True
+            except Exception as port25_err:
+                print(f"Port 25 failed: {port25_err}")
+                
+    # If all direct SMTP attempts failed, try Vercel HTTP Relay Fallback
+    import urllib.request
+    import json
+    try:
+        print("SMTP failed. Attempting Vercel HTTP relay fallback...")
+        html_content = get_html_from_msg(msg)
+        subject = msg['Subject'] or "SkillSwap Update"
+        url = "https://skill-swap-nine-xi.vercel.app/api/send-email"
+        payload = {
+            'secret': 'skillswap-secret-key-12345',
+            'recipient': recipient_email,
+            'subject': subject,
+            'html_content': html_content
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            if res_data.get('status') == 'success':
+                print("Email successfully sent via Vercel HTTP relay!")
+                return True
+    except Exception as http_err:
+        print(f"Vercel HTTP relay fallback also failed: {http_err}")
+        
+    raise Exception(f"All SMTP ports and Vercel HTTP relay failed. SSL: {ssl_err}, TLS: {tls_err}")
 
 def send_schedule_email(match, classes, recipient_email):
     """

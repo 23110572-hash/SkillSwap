@@ -89,7 +89,7 @@ SkillSwap/
       main.jsx          React DOM entry point
       apiCache.js       Lightweight API response cache with TTL support
       pages/
-        Auth.jsx          Login and registration forms, demo login shortcuts
+        Auth.jsx          Login and registration forms
         Dashboard.jsx     Personal session management, profile editing, skill listings
         Marketplace.jsx   Skill discovery, filtering, search, skill creation with AI assist
         Messages.jsx      Real-time direct messaging between users
@@ -266,7 +266,6 @@ All endpoints are prefixed with /api. The backend runs on http://127.0.0.1:5000 
 | POST | /api/auth/login | None | Validates credentials and returns a JWT token |
 | GET | /api/auth/me | JWT | Returns the profile of the currently logged-in user |
 | PATCH | /api/auth/profile | JWT | Updates username, email, or profile photo |
-| GET | /api/auth/quick-users | None | Returns or creates demo accounts for quick login |
 
 ### Skills
 
@@ -323,7 +322,7 @@ Accepting a match triggers automated class session creation. Marking a match com
 
 ### Auth.jsx
 
-Displayed when no user is logged in. Contains two tabs: Login and Register. Login accepts username and password. Register accepts username, email, and password. Both submit to the Flask API. On success, the JWT token and user object are stored in the parent App component and in localStorage. The page also provides quick-login buttons for the demo accounts.
+Displayed when no user is logged in. Contains two tabs: Login and Register. Login accepts username and password. Register accepts username, email, and password. Both submit to the Flask API. On success, the JWT token and user object are stored in the parent App component and in localStorage.
 
 ### Marketplace.jsx
 
@@ -497,21 +496,13 @@ For the frontend, run npm run build inside the frontend directory to produce a s
 
 ## Known Seed Accounts
 
-The following accounts are created automatically on first startup if they do not exist. They are intended for development and demonstration purposes.
+The following verified accounts are created automatically on first startup if they do not exist:
 
-| Username | Password | Starting Coins |
-|---|---|---|
-| krishna | 12345 | 5 |
-| subham | 12345 | 5 |
-| vikas | 12345 | 5 |
+| Username | Password | Starting Coins | Registered Email |
+|---|---|---|---|
+| krishna | 12345 | 5 | krishnaagrawal898@gmail.com |
+| subham | 12345 | 5 | subhamkewat482@gmail.com |
+| vikas | 12345 | 5 | 23110572@outr.ac.in |
 
-The Quick Users endpoint (/api/auth/quick-users) also creates the following demo accounts on first call:
+All other demo accounts have been completely removed.
 
-| Username | Password |
-|---|---|
-| JuniorDev | devpass123 |
-| SeniorEngineer | seniorpass |
-| DesignerPro | design123 |
-| AIExtremist | aipassword |
-
-These accounts appear as one-click login buttons on the Auth page of the application for ease of testing.
