@@ -469,6 +469,22 @@ def update_match_status(match_id):
 
     match.status = new_status
     db.session.commit()
+
+    if new_status == 'accepted':
+        try:
+            from flask import current_app
+            from email_utils import send_schedule_email_async
+            classes = ClassSession.query.filter_by(match_id=match.id).order_by(ClassSession.class_number.asc()).all()
+            teacher = User.query.get(match.teacher_id)
+            learner = User.query.get(match.learner_id)
+            app = current_app._get_current_object()
+            if teacher and teacher.email:
+                send_schedule_email_async(app, match, classes, teacher.email)
+            if learner and learner.email and learner.email != teacher.email:
+                send_schedule_email_async(app, match, classes, learner.email)
+        except Exception as e:
+            print(f"Failed to trigger automatic schedule emails on acceptance: {e}")
+
     return jsonify({'message': f'Session status updated to {new_status}'}), 200
 
 
@@ -587,6 +603,21 @@ def update_class_session(class_id):
 
     db.session.commit()
 
+    if 'scheduled_at' in data:
+        try:
+            from flask import current_app
+            from email_utils import send_schedule_email_async
+            classes = ClassSession.query.filter_by(match_id=match.id).order_by(ClassSession.class_number.asc()).all()
+            teacher = User.query.get(match.teacher_id)
+            learner = User.query.get(match.learner_id)
+            app = current_app._get_current_object()
+            if teacher and teacher.email:
+                send_schedule_email_async(app, match, classes, teacher.email)
+            if learner and learner.email and learner.email != teacher.email:
+                send_schedule_email_async(app, match, classes, learner.email)
+        except Exception as e:
+            print(f"Failed to trigger automatic schedule emails on reschedule: {e}")
+
     return jsonify({
         'id': class_sess.id,
         'match_id': class_sess.match_id,
@@ -599,6 +630,37 @@ def update_class_session(class_id):
         'ai_feedback': class_sess.ai_feedback,
         'match_status': match.status
     }), 200
+
+
+
+@api_bp.route('/matches/<int:match_id>/email-schedule', methods=['POST'])
+@jwt_required()
+def email_match_schedule(match_id):
+    user_id = int(get_jwt_identity())
+    match = Match.query.get(match_id)
+    if not match:
+        return jsonify({'message': 'Match not found'}), 404
+        
+    if match.learner_id != user_id and match.teacher_id != user_id:
+        return jsonify({'message': 'Unauthorized to request schedule for this match'}), 403
+        
+    classes = ClassSession.query.filter_by(match_id=match_id).order_by(ClassSession.class_number.asc()).all()
+    if not classes:
+        return jsonify({'message': 'No classes found for this match'}), 400
+        
+    user = User.query.get(user_id)
+    if not user or not user.email:
+        return jsonify({'message': 'User or user email not found'}), 400
+        
+    try:
+        from email_utils import send_schedule_email
+        success = send_schedule_email(match, classes, user.email)
+        if success:
+            return jsonify({'message': f'Schedule emailed successfully to {user.email}'}), 200
+        else:
+            return jsonify({'message': 'Failed to send email. Check backend logs/SMTP settings.'}), 500
+    except Exception as e:
+        return jsonify({'message': f'Error sending email: {str(e)}'}), 500
 
 
 

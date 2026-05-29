@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Coins, BookOpen, GraduationCap, CheckCircle, Clock, Check, X, ExternalLink, Settings, Camera, Calendar, RefreshCw, Sparkles, Star, Trash2 } from 'lucide-react';
+import { Coins, BookOpen, GraduationCap, CheckCircle, Clock, Check, X, ExternalLink, Settings, Camera, Calendar, RefreshCw, Sparkles, Star, Trash2, Mail } from 'lucide-react';
 import { cachedGet, invalidateCache } from '../apiCache';
 
 function Dashboard({ user, token, onUpdateUser, onSelectMatch, setPage }) {
@@ -14,6 +14,8 @@ function Dashboard({ user, token, onUpdateUser, onSelectMatch, setPage }) {
   const [selectedScheduleMatch, setSelectedScheduleMatch] = useState(null);
   const [scheduleSyllabus, setScheduleSyllabus] = useState([]);
   const [loadingScheduleSyllabus, setLoadingScheduleSyllabus] = useState(false);
+  const [emailingSchedule, setEmailingSchedule] = useState(false);
+  const [emailStatus, setEmailStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // Review Modal & Rating States
   const [selectedReviewMatch, setSelectedReviewMatch] = useState(null);
@@ -30,8 +32,30 @@ function Dashboard({ user, token, onUpdateUser, onSelectMatch, setPage }) {
       fetchScheduleSyllabus(selectedScheduleMatch);
     } else {
       setScheduleSyllabus([]);
+      setEmailStatus('idle');
     }
   }, [selectedScheduleMatch]);
+
+  const handleEmailSchedule = async () => {
+    if (!selectedScheduleMatch) return;
+    setEmailingSchedule(true);
+    setEmailStatus('loading');
+    try {
+      await axios.post(
+        `http://127.0.0.1:5000/api/matches/${selectedScheduleMatch.id}/email-schedule`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setEmailStatus('success');
+      setTimeout(() => setEmailStatus('idle'), 3000);
+    } catch (err) {
+      console.error(err);
+      setEmailStatus('error');
+      setTimeout(() => setEmailStatus('idle'), 3000);
+    } finally {
+      setEmailingSchedule(false);
+    }
+  };
 
   const fetchScheduleSyllabus = async (match) => {
     setLoadingScheduleSyllabus(true);
@@ -780,10 +804,42 @@ function Dashboard({ user, token, onUpdateUser, onSelectMatch, setPage }) {
               )}
 
               <div className="border-t border-slate-100 pt-5">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-indigo-500" />
-                  <span>Finalized Lecture Dates & Syllabus</span>
-                </h4>
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-indigo-500" />
+                    <span>Finalized Lecture Dates & Syllabus</span>
+                  </h4>
+                  <button
+                    onClick={handleEmailSchedule}
+                    disabled={emailingSchedule}
+                    className={`px-3 py-1.5 border rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 flex items-center gap-1.5 cursor-pointer ${
+                      emailStatus === 'success'
+                        ? 'bg-emerald-50 border-emerald-250 text-emerald-700'
+                        : emailStatus === 'error'
+                        ? 'bg-red-50 border-red-200 text-red-750'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {emailStatus === 'loading' ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : emailStatus === 'success' ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : emailStatus === 'error' ? (
+                      <X className="w-3.5 h-3.5" />
+                    ) : (
+                      <Mail className="w-3.5 h-3.5 text-slate-550" />
+                    )}
+                    <span>
+                      {emailStatus === 'loading'
+                        ? 'Sending...'
+                        : emailStatus === 'success'
+                        ? 'Emailed!'
+                        : emailStatus === 'error'
+                        ? 'Failed!'
+                        : 'Email Schedule'}
+                    </span>
+                  </button>
+                </div>
                 
                 {loadingScheduleSyllabus ? (
                   <div className="flex items-center gap-2.5 py-6 text-slate-455 text-xs font-semibold justify-center">

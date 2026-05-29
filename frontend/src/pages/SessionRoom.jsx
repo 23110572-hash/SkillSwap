@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Play, Sparkles, CheckCircle2, AlertTriangle, Lightbulb, RefreshCw, Check, ArrowLeft, Award, Video, MessageSquare, BookOpen, Clock, GraduationCap, X, Star, Calendar, Lock, Unlock, Info } from 'lucide-react';
+import { Play, Sparkles, CheckCircle2, AlertTriangle, Lightbulb, RefreshCw, Check, ArrowLeft, Award, Video, MessageSquare, BookOpen, Clock, GraduationCap, X, Star, Calendar, Lock, Unlock, Info, Mail } from 'lucide-react';
 
 function SessionRoom({ user, token, activeMatch, onUpdateUser, setPage }) {
   const [transcript, setTranscript] = useState('');
@@ -34,6 +34,8 @@ function SessionRoom({ user, token, activeMatch, onUpdateUser, setPage }) {
   const [classNotes, setClassNotes] = useState('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [expandedSessionId, setExpandedSessionId] = useState(null);
+  const [emailingSchedule, setEmailingSchedule] = useState(false);
+  const [emailStatus, setEmailStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
 
   const presets = [
@@ -79,12 +81,34 @@ function SessionRoom({ user, token, activeMatch, onUpdateUser, setPage }) {
     }
   };
 
+  const handleEmailSchedule = async () => {
+    if (!currentMatch) return;
+    setEmailingSchedule(true);
+    setEmailStatus('loading');
+    try {
+      await axios.post(
+        `http://127.0.0.1:5000/api/matches/${currentMatch.id}/email-schedule`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setEmailStatus('success');
+      setTimeout(() => setEmailStatus('idle'), 3000);
+    } catch (err) {
+      console.error(err);
+      setEmailStatus('error');
+      setTimeout(() => setEmailStatus('idle'), 3000);
+    } finally {
+      setEmailingSchedule(false);
+    }
+  };
+
   useEffect(() => {
     if (currentMatch) {
       fetchClasses(currentMatch.id);
     } else {
       setClasses([]);
       setActiveClass(null);
+      setEmailStatus('idle');
     }
   }, [currentMatch]);
 
@@ -1136,12 +1160,45 @@ function SessionRoom({ user, token, activeMatch, onUpdateUser, setPage }) {
           </div>
         </div>
 
-        {currentMatch.status === 'completed' && (
-          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-250 text-emerald-700 px-5 py-3 rounded-xl text-sm font-bold shadow-sm">
-            <Check className="w-5 h-5" />
-            <span>Course Completed Successfully! Coins transferred.</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
+          {currentMatch.status === 'completed' && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-250 text-emerald-700 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>Course Completed Successfully!</span>
+            </div>
+          )}
+          
+          <button
+            onClick={handleEmailSchedule}
+            disabled={emailingSchedule}
+            className={`px-4 py-2.5 border rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 flex items-center gap-1.5 cursor-pointer ${
+              emailStatus === 'success'
+                ? 'bg-emerald-50 border-emerald-250 text-emerald-700'
+                : emailStatus === 'error'
+                ? 'bg-red-50 border-red-200 text-red-750'
+                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+          >
+            {emailStatus === 'loading' ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : emailStatus === 'success' ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : emailStatus === 'error' ? (
+              <X className="w-3.5 h-3.5" />
+            ) : (
+              <Mail className="w-3.5 h-3.5 text-slate-555" />
+            )}
+            <span>
+              {emailStatus === 'loading'
+                ? 'Sending...'
+                : emailStatus === 'success'
+                ? 'Emailed!'
+                : emailStatus === 'error'
+                ? 'Failed!'
+                : 'Email Schedule'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Progress tracker bar */}
