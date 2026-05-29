@@ -5,6 +5,48 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from models import User, Skill
 
+def send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipient_email, msg):
+    ssl_err = None
+    tls_err = None
+    # Try SSL first if port is 465
+    if smtp_port == 465:
+        try:
+            print("Attempting SMTP_SSL on port 465...")
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, recipient_email, msg.as_string())
+            server.quit()
+            return True
+        except Exception as e:
+            ssl_err = e
+            print(f"SSL port 465 failed: {ssl_err}. Falling back to TLS port 587...")
+            smtp_port = 587
+    
+    # Try TLS on port 587
+    try:
+        print("Attempting SMTP with STARTTLS on port 587...")
+        server = smtplib.SMTP(smtp_server, 587, timeout=10)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, recipient_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        tls_err = e
+        print(f"TLS port 587 failed: {tls_err}")
+        # Try port 25 as last resort
+        try:
+            print("Attempting SMTP on port 25...")
+            server = smtplib.SMTP(smtp_server, 25, timeout=10)
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, recipient_email, msg.as_string())
+            server.quit()
+            return True
+        except Exception as port25_err:
+            print(f"Port 25 failed: {port25_err}")
+            raise Exception(f"All SMTP ports failed. SSL: {ssl_err}, TLS: {tls_err}, Port 25: {port25_err}")
+
 def send_schedule_email(match, classes, recipient_email):
     """
     Sends an email with the complete class schedule table to the recipient_email.
@@ -267,17 +309,7 @@ def send_schedule_email(match, classes, recipient_email):
 
     # Send via SMTP connection (catch and print errors to prevent server crash)
     try:
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-        else:
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-            server.starttls()
-        
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, recipient_email, msg.as_string())
-        server.quit()
-        print(f"Schedule email successfully sent to {recipient_email}")
-        return True
+        return send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipient_email, msg)
     except Exception as e:
         print(f"SMTP error sending schedule email to {recipient_email}: {e}")
         return False
@@ -417,17 +449,7 @@ def send_verification_email(recipient_email, code):
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-        else:
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-            server.starttls()
-        
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, recipient_email, msg.as_string())
-        server.quit()
-        print(f"Verification email successfully sent to {recipient_email}")
-        return True
+        return send_email_via_smtp(smtp_server, smtp_port, smtp_user, smtp_password, recipient_email, msg)
     except Exception as e:
         print(f"SMTP error sending verification email to {recipient_email}: {e}")
         return False
