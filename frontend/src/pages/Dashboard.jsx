@@ -302,6 +302,16 @@ function Dashboard({ user, token, onUpdateUser, onSelectMatch, setPage }) {
         }
       );
 
+      // On success, check if email changed
+      if (res.data.email_changed) {
+        setModalSuccess('Email changed! Please verify your new email.');
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          window.location.reload();
+        }, 1500);
+        return;
+      }
+
       // On success, update the parent state
       onUpdateUser(res.data);
       setModalSuccess('Profile updated successfully!');

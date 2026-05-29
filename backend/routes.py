@@ -26,12 +26,30 @@ def register():
     if User.query.filter((User.username == username) | (User.email == email)).first():
         return jsonify({'message': 'Username or email already exists'}), 400
 
-    user = User(username=username, email=email,
-                password_hash=generate_password_hash(password), credits=5)
+    import random
+    from datetime import datetime, timedelta
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    user = User(
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(password),
+        credits=5,
+        is_verified=False,
+        verification_code=code,
+        verification_code_expires_at=expires_at
+    )
     try:
         db.session.add(user)
         db.session.commit()
-        return jsonify({'message': 'User registered successfully'}), 201
+
+        # Send email asynchronously
+        from flask import current_app
+        from email_utils import send_verification_email_async
+        send_verification_email_async(current_app._get_current_object(), email, code)
+
+        return jsonify({'message': 'User registered successfully. Verification code sent.', 'email': email}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
@@ -49,6 +67,25 @@ def login():
     user = User.query.filter_by(username=username).first()
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({'message': 'Invalid credentials'}), 401
+
+    if not user.is_verified:
+        from datetime import datetime, timedelta
+        import random
+        if not user.verification_code_expires_at or user.verification_code_expires_at < datetime.utcnow():
+            code = f"{random.randint(100000, 999999)}"
+            user.verification_code = code
+            user.verification_code_expires_at = datetime.utcnow() + timedelta(hours=1)
+            db.session.commit()
+            
+            from flask import current_app
+            from email_utils import send_verification_email_async
+            send_verification_email_async(current_app._get_current_object(), user.email, code)
+        
+        return jsonify({
+            'message': 'Please verify your email address before logging in.',
+            'email': user.email,
+            'not_verified': True
+        }), 403
 
     token = create_access_token(identity=str(user.id))
     return jsonify({
@@ -79,6 +116,77 @@ def get_me():
     }), 200
 
 
+@api_bp.route('/auth/verify-email', methods=['POST'])
+def verify_email():
+    data = request.get_json() or {}
+    email = data.get('email')
+    code = data.get('code')
+
+    if not email or not code:
+        return jsonify({'message': 'Email and verification code are required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    if user.is_verified:
+        return jsonify({'message': 'Email is already verified'}), 200
+
+    from datetime import datetime
+    if user.verification_code != str(code).strip():
+        return jsonify({'message': 'Invalid verification code'}), 400
+
+    if user.verification_code_expires_at and user.verification_code_expires_at < datetime.utcnow():
+        return jsonify({'message': 'Verification code has expired. Please request a new one.'}), 400
+
+    user.is_verified = True
+    user.verification_code = None
+    user.verification_code_expires_at = None
+    db.session.commit()
+
+    token = create_access_token(identity=str(user.id))
+    return jsonify({
+        'message': 'Email verified successfully!',
+        'token': token,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'credits': user.credits,
+            'profile_pic': user.profile_pic
+        }
+    }), 200
+
+
+@api_bp.route('/auth/resend-verification', methods=['POST'])
+def resend_verification():
+    data = request.get_json() or {}
+    email = data.get('email')
+
+    if not email:
+        return jsonify({'message': 'Email is required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    if user.is_verified:
+        return jsonify({'message': 'Email is already verified'}), 400
+
+    import random
+    from datetime import datetime, timedelta
+    code = f"{random.randint(100000, 999999)}"
+    user.verification_code = code
+    user.verification_code_expires_at = datetime.utcnow() + timedelta(hours=1)
+    db.session.commit()
+
+    from flask import current_app
+    from email_utils import send_verification_email_async
+    send_verification_email_async(current_app._get_current_object(), user.email, code)
+
+    return jsonify({'message': 'Verification code resent successfully.'}), 200
+
+
 @api_bp.route('/auth/profile', methods=['PATCH'])
 @jwt_required()
 def update_profile():
@@ -97,22 +205,37 @@ def update_profile():
             return jsonify({'message': 'Username already taken'}), 400
         user.username = username
 
-    if email:
+    email_changed = False
+    if email and email.strip().lower() != user.email.strip().lower():
         if User.query.filter(User.email == email, User.id != user_id).first():
             return jsonify({'message': 'Email already taken'}), 400
-        user.email = email
+        from datetime import datetime, timedelta
+        import random
+        user.email = email.strip()
+        user.is_verified = False
+        code = f"{random.randint(100000, 999999)}"
+        user.verification_code = code
+        user.verification_code_expires_at = datetime.utcnow() + timedelta(hours=1)
+        email_changed = True
 
     if profile_pic is not None:
         user.profile_pic = profile_pic
 
     try:
         db.session.commit()
+
+        if email_changed:
+            from flask import current_app
+            from email_utils import send_verification_email_async
+            send_verification_email_async(current_app._get_current_object(), user.email, user.verification_code)
+
         return jsonify({
             'id': user.id,
             'username': user.username,
             'email': user.email,
             'credits': user.credits,
-            'profile_pic': user.profile_pic
+            'profile_pic': user.profile_pic,
+            'email_changed': email_changed
         }), 200
     except Exception as e:
         db.session.rollback()
@@ -130,7 +253,8 @@ def get_quick_users():
         user = User.query.filter_by(username=u).first()
         if not user:
             user = User(username=u, email=em,
-                        password_hash=generate_password_hash(p), credits=5)
+                        password_hash=generate_password_hash(p), credits=5,
+                        is_verified=True)
             db.session.add(user)
             db.session.commit()
         users.append({'username': u, 'password': p, 'email': em, 'credits': user.credits})

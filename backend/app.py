@@ -92,7 +92,8 @@ def create_app(config_name='development'):
                         username=u_info['username'],
                         email=u_info['email'],
                         password_hash=pw_hash,
-                        credits=5
+                        credits=5,
+                        is_verified=True
                     ))
             db.session.commit()
             print("OK  Seed users ready")

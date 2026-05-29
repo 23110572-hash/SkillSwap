@@ -11,6 +11,9 @@ class User(db.Model):
     credits = db.Column(db.Integer, default=5)  # Starting credits
     profile_pic = db.Column(db.Text, nullable=True) # Base64 encoded string
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_code = db.Column(db.String(10), nullable=True)
+    verification_code_expires_at = db.Column(db.DateTime, nullable=True)
     
     # Relationships
     skills_offered = db.relationship('Skill', backref='instructor', lazy=True)

@@ -296,3 +296,153 @@ def send_schedule_email_async(app, match, classes, recipient_email):
     thread = threading.Thread(target=run)
     thread.daemon = True
     thread.start()
+
+def send_verification_email(recipient_email, code):
+    """
+    Sends a verification email with a 6-digit code to the recipient_email.
+    """
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    try:
+        smtp_port = int(os.getenv('SMTP_PORT', '465'))
+    except ValueError:
+        smtp_port = 465
+    smtp_user = os.getenv('SMTP_USER', 'krishnaagrawal0706@gmail.com')
+    smtp_password = os.getenv('SMTP_PASSWORD', 'yxjovzacuabanpbn')
+
+    if not smtp_user or not smtp_password:
+        print("SMTP credentials are not configured. Cannot send verification email.")
+        return False
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Verify Your Email</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #f8fafc;
+                color: #1e293b;
+                margin: 0;
+                padding: 0;
+            }}
+            .container {{
+                max-width: 500px;
+                margin: 40px auto;
+                background: #ffffff;
+                border-radius: 16px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+            }}
+            .header {{
+                background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+                padding: 30px 20px;
+                text-align: center;
+                color: #ffffff;
+            }}
+            .header h1 {{
+                margin: 0;
+                font-size: 22px;
+                font-weight: 800;
+                letter-spacing: -0.5px;
+            }}
+            .content {{
+                padding: 30px;
+                text-align: center;
+            }}
+            .code-box {{
+                display: inline-block;
+                background-color: #f1f5f9;
+                border: 2px dashed #4f46e5;
+                color: #4f46e5;
+                font-size: 32px;
+                font-weight: 800;
+                letter-spacing: 5px;
+                padding: 15px 30px;
+                border-radius: 12px;
+                margin: 25px 0;
+            }}
+            .instructions {{
+                font-size: 14px;
+                color: #475569;
+                line-height: 1.6;
+                margin-bottom: 10px;
+            }}
+            .warning {{
+                font-size: 12px;
+                color: #94a3b8;
+                margin-top: 20px;
+            }}
+            .footer {{
+                background-color: #f8fafc;
+                padding: 20px;
+                text-align: center;
+                font-size: 11px;
+                color: #94a3b8;
+                border-top: 1px solid #e2e8f0;
+            }}
+            .footer a {{
+                color: #4f46e5;
+                text-decoration: none;
+                font-weight: 600;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Verify Your Email Address</h1>
+            </div>
+            <div class="content">
+                <p class="instructions">Thank you for joining SkillSwap! Please use the following 6-digit verification code to complete your registration or email update:</p>
+                <div class="code-box">{code}</div>
+                <p class="instructions">Enter this code in the verification screen to activate your account and unlock peer learning.</p>
+                <p class="warning">This verification code is valid for 1 hour. If you did not request this code, please ignore this email.</p>
+            </div>
+            <div class="footer">
+                <p>Sent via <a href="https://skillswap.app">SkillSwap</a> Peer Learning Platform.</p>
+                <p>&copy; 2026 SkillSwap. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = f"SkillSwap: Verify Your Email Address"
+    msg['From'] = smtp_user
+    msg['To'] = recipient_email
+    msg.attach(MIMEText(html_content, 'html'))
+
+    try:
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+            server.starttls()
+        
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, recipient_email, msg.as_string())
+        server.quit()
+        print(f"Verification email successfully sent to {recipient_email}")
+        return True
+    except Exception as e:
+        print(f"SMTP error sending verification email to {recipient_email}: {e}")
+        return False
+
+def send_verification_email_async(app, recipient_email, code):
+    """
+    Sends the verification email in a background thread to prevent blocking client requests.
+    """
+    def run():
+        with app.app_context():
+            try:
+                send_verification_email(recipient_email, code)
+            except Exception as e:
+                app.logger.error(f"Async verification email sending exception: {e}")
+    
+    thread = threading.Thread(target=run)
+    thread.daemon = True
+    thread.start()
