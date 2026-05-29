@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db
-from models import User, Skill, CreditTransaction, Validation, Match, Review, Message, ClassSession
+from models import User, Skill, CreditTransaction, Validation, Match, Review, Message, ClassSession, UserSkill
 from sqlalchemy import func
 import os
 import json
@@ -23,8 +23,27 @@ def register():
     if not username or not email or not password:
         return jsonify({'message': 'Missing username, email, or password'}), 400
 
-    if User.query.filter((User.username == username) | (User.email == email)).first():
-        return jsonify({'message': 'Username or email already exists'}), 400
+    # If the user or email exists but is not verified, delete it to allow re-registration
+    existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
+    if existing_user:
+        if not existing_user.is_verified:
+            try:
+                # Delete any associated data just in case to avoid foreign key errors
+                Message.query.filter((Message.sender_id == existing_user.id) | (Message.recipient_id == existing_user.id)).delete()
+                Review.query.filter((Review.reviewer_id == existing_user.id) | (Review.reviewed_user_id == existing_user.id)).delete()
+                Match.query.filter((Match.learner_id == existing_user.id) | (Match.teacher_id == existing_user.id)).delete()
+                Validation.query.filter_by(user_id=existing_user.id).delete()
+                CreditTransaction.query.filter_by(user_id=existing_user.id).delete()
+                UserSkill.query.filter_by(user_id=existing_user.id).delete()
+                Skill.query.filter_by(user_id=existing_user.id).delete()
+                
+                db.session.delete(existing_user)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({'message': f'Database cleanup error: {str(e)}'}), 500
+        else:
+            return jsonify({'message': 'Username or email already exists'}), 400
 
     import random
     from datetime import datetime, timedelta
@@ -1185,3 +1204,104 @@ def get_user_reviews(reviewed_user_id):
         'average_rating': round(total_rating / len(reviews), 1) if reviews else 0.0,
         'count': len(reviews)
     }), 200
+
+
+@api_bp.route('/debug/test-smtp', methods=['GET'])
+def debug_test_smtp():
+    import traceback
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    recipient = request.args.get('email', 'krishnaagrawal0706@gmail.com')
+    
+    # Load configuration
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    try:
+        smtp_port = int(os.getenv('SMTP_PORT', '465'))
+    except ValueError:
+        smtp_port = 465
+    smtp_user = os.getenv('SMTP_USER', 'krishnaagrawal0706@gmail.com')
+    smtp_password = os.getenv('SMTP_PASSWORD', 'yxjovzacuabanpbn')
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "SkillSwap SMTP Test Connection"
+    msg['From'] = smtp_user
+    msg['To'] = recipient
+    msg.attach(MIMEText("This is a test email from the SkillSwap production server to verify SMTP connectivity.", 'plain'))
+
+    logs = []
+    def log_print(msg_text):
+        logs.append(msg_text)
+        print(msg_text)
+
+    # Let's run the connection process step by step, capturing output
+    ssl_err = None
+    tls_err = None
+    port25_err = None
+    
+    log_print(f"SMTP Server: {smtp_server}")
+    log_print(f"SMTP Port: {smtp_port}")
+    log_print(f"SMTP User: {smtp_user}")
+    log_print(f"Recipient: {recipient}")
+
+    # Try SSL first if port is 465
+    if smtp_port == 465:
+        try:
+            log_print("Attempting SMTP_SSL on port 465...")
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+            log_print("SMTP_SSL server connection succeeded. Attempting login...")
+            server.login(smtp_user, smtp_password)
+            log_print("Login succeeded. Sending mail...")
+            server.sendmail(smtp_user, recipient, msg.as_string())
+            server.quit()
+            log_print("Mail sent successfully via Port 465!")
+            return jsonify({'status': 'success', 'logs': logs}), 200
+        except Exception as e:
+            ssl_err = traceback.format_exc()
+            log_print(f"SSL port 465 failed: {str(e)}. Falling back to TLS port 587...")
+            smtp_port = 587
+    
+    # Try TLS on port 587
+    try:
+        log_print("Attempting SMTP with STARTTLS on port 587...")
+        server = smtplib.SMTP(smtp_server, 587, timeout=10)
+        log_print("SMTP connection established. Sending STARTTLS...")
+        server.starttls()
+        log_print("STARTTLS succeeded. Attempting login...")
+        server.login(smtp_user, smtp_password)
+        log_print("Login succeeded. Sending mail...")
+        server.sendmail(smtp_user, recipient, msg.as_string())
+        server.quit()
+        log_print("Mail sent successfully via Port 587!")
+        return jsonify({'status': 'success', 'logs': logs}), 200
+    except Exception as e:
+        tls_err = traceback.format_exc()
+        log_print(f"TLS port 587 failed: {str(e)}")
+        
+        # Try port 25
+        try:
+            log_print("Attempting SMTP on port 25...")
+            server = smtplib.SMTP(smtp_server, 25, timeout=10)
+            log_print("SMTP connection established. Sending STARTTLS...")
+            server.starttls()
+            log_print("STARTTLS succeeded. Attempting login...")
+            server.login(smtp_user, smtp_password)
+            log_print("Login succeeded. Sending mail...")
+            server.sendmail(smtp_user, recipient, msg.as_string())
+            server.quit()
+            log_print("Mail sent successfully via Port 25!")
+            return jsonify({'status': 'success', 'logs': logs}), 200
+        except Exception as e25:
+            port25_err = traceback.format_exc()
+            log_print(f"Port 25 failed: {str(e25)}")
+
+    return jsonify({
+        'status': 'error',
+        'logs': logs,
+        'errors': {
+            'ssl_465': ssl_err,
+            'tls_587': tls_err,
+            'port_25': port25_err
+        }
+    }), 500
