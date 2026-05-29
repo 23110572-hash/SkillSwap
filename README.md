@@ -504,5 +504,3 @@ The following verified accounts are created automatically on first startup if th
 | subham | 12345 | 5 | subhamkewat482@gmail.com |
 | vikas | 12345 | 5 | 23110572@outr.ac.in |
 
-All other demo accounts have been completely removed.
-
