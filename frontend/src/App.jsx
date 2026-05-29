@@ -117,12 +117,6 @@ function App() {
           )}
 
           <div className="flex items-center gap-4">
-            {/* Backend Status indicator */}
-            <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200/80 rounded-full text-xs shadow-sm">
-              <span className={`w-2 h-2 rounded-full ${backendOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-              <span className="text-slate-600 font-bold">{backendOnline ? 'API Connected' : 'API Offline'}</span>
-            </div>
-
             {user ? (
               <div className="flex items-center gap-3">
                 {/* Coin Counter */}
